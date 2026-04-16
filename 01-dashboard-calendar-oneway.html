@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍔漢堡旅行機票 x 計畫 - 機票雷達</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a1a; font-size: 14px; }
+
+  .topbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .topbar-title { font-size: 15px; font-weight: 700; }
+  .topbar-sub { font-size: 11px; color: #888; }
+  .dep-tabs { display: flex; gap: 2px; background: #f0f0f0; border-radius: 6px; padding: 2px; }
+  .dep-tab { padding: 5px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; border: none; background: transparent; color: #666; font-weight: 500; }
+  .dep-tab.active { background: #fff; color: #1a1a1a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 600; }
+
+  .container { max-width: 1300px; margin: 0 auto; padding: 16px 20px; }
+
+  .month-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .month-btn { padding: 4px 12px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; color: #555; font-weight: 500; }
+  .month-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+
+  .country-label { font-size: 13px; font-weight: 700; margin: 14px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 6px; }
+  .country-badge { font-size: 10px; color: #999; background: #f5f5f5; padding: 1px 6px; border-radius: 3px; font-weight: 400; }
+
+  .routes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+
+  .rc { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+  .rc-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-bottom: 1px solid #f5f5f5; }
+  .rc-city { font-size: 13px; font-weight: 700; }
+  .rc-caa { font-size: 9px; color: #bbb; margin-top: 2px; }
+  .rc-dir { display: flex; gap: 6px; font-size: 10px; }
+
+  /* Dual calendar layout */
+  .dual-cal { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0; }
+  .dual-side { padding: 6px 8px 8px; }
+  .dual-side.left { border-right: 1px solid #f1f5f9; }
+  .side-title { font-size: 10px; font-weight: 600; text-align: center; margin-bottom: 4px; padding: 2px; border-radius: 3px; }
+  .side-title.out { color: #166534; background: #f0fdf4; }
+  .side-title.ret { color: #1e40af; background: #eff6ff; }
+
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-hdr { text-align: center; color: #999; padding: 2px 0; font-weight: 600; font-size: 9px; }
+  .cal-hdr.we { color: #f87171; }
+  .cal-day { min-height: 32px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+  .cal-day:hover { outline: 2px solid #3b82f6; outline-offset: -2px; cursor: pointer; }
+  .cal-empty { background: transparent; min-height: 0; }
+  .cal-empty:hover { outline: none; cursor: default; }
+  .cal-nd { background: #fafafa; }
+
+  /* Top 8 highlight */
+  .cal-top { position: relative; }
+  .cal-rank { position: absolute; top: 1px; left: 1px; font-size: 6px; font-weight: 700; color: #fff; background: #16a34a; padding: 0 2px; border-radius: 0 0 3px 0; line-height: 1.2; }
+
+  .cal-legend { display: flex; gap: 10px; padding: 6px 8px 4px; font-size: 9px; color: #999; flex-wrap: wrap; }
+  .cal-legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: 2px; }
+
+  .footer { text-align: center; padding: 16px; font-size: 10px; color: #ccc; }
+
+  @media (max-width: 768px) {
+    .topbar { flex-direction: column; gap: 8px; align-items: flex-start; }
+    .routes-grid { grid-template-columns: 1fr; }
+    .dep-tabs { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">🍔漢堡旅行機票 x 計畫 - 機票雷達</div>
+    <div class="topbar-sub" id="topbar-sub"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="dep-tabs" id="dep-tabs"></div>
+  </div>
+</div>
+
+<div class="container">
+  <h1 style="font-size:18px;font-weight:700;margin-bottom:10px"><i class="fa-solid fa-calendar-days" style="margin-right:6px;color:#3b82f6"></i>去回分列價格行事曆</h1>
+  <div class="month-bar" id="month-bar"></div>
+  <div id="route-sections"></div>
+</div>
+
+<div class="footer">機票雷達 . Trip.com</div>
+
+<script>
+var DN = ['日','一','二','三','四','五','六'];
+var NOW = new Date(); NOW.setHours(0,0,0,0);
+var CUR_YEAR = NOW.getFullYear(), CUR_MONTH = NOW.getMonth();
+var viewYear = CUR_YEAR, viewMonth = CUR_MONTH;
+var activeDep = 'TPE';
+
+// 設定3 色階
+var PP = [
+  {lte:2000,bg:'#85fb37'},{lte:3000,bg:'#d4ffb8'},{lte:3500,bg:'#daebd0'},
+  {lte:5000,bg:'#ededed'},{lte:6000,bg:'#ededed'},{lte:7000,bg:'#f7c5c5'},
+  {lte:8000,bg:'#fba2a2'},{lte:10000,bg:'#fb7489'},{lte:99999,bg:'#b6a5f8'}
+];
+var BG = {normal:'#fafafa',weekend:'#f9c3c3',holiday:'#ffeea8',nodata:'#f5f5f5'};
+var TC = {price:'#1e293b',priceAlt:'#475569',holiday:'#92400e',weekend:'#dc2626'};
+
+function getBg(p) { for(var i=0;i<PP.length;i++){if(p<=PP[i].lte)return PP[i].bg;} return PP[PP.length-1].bg; }
+function txtC(bg) { var h=bg.replace('#',''),r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16); return (r*.299+g*.587+b*.114)>150?'#1a1a1a':'#fff'; }
+function fP(p) { return p.toLocaleString(); }
+
+var HOLIDAYS = {"2026":{"20260101":"元旦","20260215":"除夕","20260216":"春節","20260217":"初二","20260218":"初三","20260219":"初四","20260220":"初五","20260228":"和平","20260403":"補假","20260404":"兒童節","20260405":"清明","20260406":"補假","20260501":"勞動","20260619":"端午","20260925":"中秋","20261009":"補假","20261010":"國慶"}};
+function getHol(dk){var d=new Date(dk),y=d.getFullYear()+'',k=y+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');return HOLIDAYS[y]&&HOLIDAYS[y][k]?HOLIDAYS[y][k]:null;}
+
+// ============================================================
+// Route data (same as 01-dashboard)
+// ============================================================
+var DEP_DATA = {
+  TPE: { label:'TPE 台北桃園', groups:[
+    { country:'日本', flag:'🇯🇵', routes:[
+      { city:'東京成田', code:'NRT', caa:'載客 317,406',
+        out:{"2026-04-09":6230,"2026-04-10":5690,"2026-04-11":5708,"2026-04-12":6195,"2026-04-13":6908,"2026-04-14":5434,"2026-04-15":4959,"2026-04-16":6206,"2026-04-17":6173,"2026-04-18":6206,"2026-04-19":6378,"2026-04-20":6178,"2026-04-21":4559,"2026-04-22":4587,"2026-04-23":5209,"2026-04-24":5904,"2026-04-25":5634,"2026-04-26":4308,"2026-04-27":3911,"2026-04-28":3485,"2026-04-29":4234,"2026-04-30":5434,"2026-05-01":5471,"2026-05-02":4275,"2026-05-03":3178,"2026-05-04":4793,"2026-05-05":7318,"2026-05-06":10193,"2026-05-07":7778,"2026-05-08":8046,"2026-05-09":8057,"2026-05-10":6857,"2026-05-11":5485,"2026-05-12":5485,"2026-05-13":4793,"2026-05-14":5434,"2026-05-15":5424,"2026-05-16":5471,"2026-05-17":4992,"2026-05-18":5792,"2026-05-19":5024,"2026-05-20":4992,"2026-05-21":3942,"2026-05-22":4549,"2026-05-23":5471,"2026-05-24":5024,"2026-05-25":4632,"2026-05-26":3517,"2026-05-27":7569,"2026-05-28":3911,"2026-05-29":4581,"2026-05-30":4555,"2026-05-31":5062,"2026-06-01":4592,"2026-06-02":3911,"2026-06-03":4648,"2026-06-04":4549,"2026-06-05":3954,"2026-06-06":4549,"2026-06-07":5485},
+        ret:{"2026-04-09":4670,"2026-04-10":4615,"2026-04-11":6564,"2026-04-12":8778,"2026-04-13":7918,"2026-04-14":4406,"2026-04-15":4215,"2026-04-16":3959,"2026-04-17":4831,"2026-04-18":4461,"2026-04-19":5843,"2026-04-20":5192,"2026-04-21":4831,"2026-04-22":4181,"2026-04-23":4568,"2026-04-24":6206,"2026-04-25":5764,"2026-04-26":7504,"2026-04-27":6527,"2026-04-28":9392,"2026-04-29":8053,"2026-04-30":9351,"2026-05-01":11407,"2026-05-02":9351,"2026-05-03":9309,"2026-05-04":5503,"2026-05-05":4013,"2026-05-06":2910,"2026-05-07":2770,"2026-05-08":2770,"2026-05-09":2819,"2026-05-10":3089,"2026-05-11":3922,"2026-05-12":2912,"2026-05-13":2843,"2026-05-14":3005,"2026-05-15":3578,"2026-05-16":3894,"2026-05-17":4141,"2026-05-18":4243,"2026-05-19":3308,"2026-05-20":2815,"2026-05-21":2815,"2026-05-22":3531,"2026-05-23":3894,"2026-05-24":4555,"2026-05-25":4141,"2026-05-26":3809,"2026-05-27":3542,"2026-05-28":3658,"2026-05-29":4001,"2026-05-30":4448,"2026-05-31":4448,"2026-06-01":3838,"2026-06-02":3243,"2026-06-03":3066,"2026-06-04":3047,"2026-06-05":3540,"2026-06-06":3545,"2026-06-07":3266}
+      },
+      { city:'大阪關西', code:'KIX', caa:'載客 263,924',
+        out:{'2026-04-16':3070,'2026-04-18':2900,'2026-04-20':3500,'2026-04-22':2900,'2026-04-25':3200,'2026-04-29':3700,'2026-05-01':3100,'2026-05-05':2800,'2026-05-10':2650,'2026-05-18':3100},
+        ret:{'2026-04-16':2503,'2026-04-17':2800,'2026-04-20':3100,'2026-04-22':2900,'2026-04-25':3200,'2026-04-29':3700,'2026-05-05':2600,'2026-05-10':2650,'2026-05-15':2800}
+      },
+      { city:'沖繩那霸', code:'OKA', caa:'載客 136,549',
+        out:{'2026-04-15':2461,'2026-04-16':2890,'2026-04-18':2650,'2026-04-19':4200,'2026-04-20':4580,'2026-04-22':2780,'2026-04-25':3450,'2026-04-26':5120,'2026-04-29':3800,'2026-05-01':4200,'2026-05-03':6100,'2026-05-05':4300,'2026-05-10':3100,'2026-05-15':2600},
+        ret:{'2026-04-16':3216,'2026-04-17':2900,'2026-04-19':3500,'2026-04-20':3800,'2026-04-22':2650,'2026-04-25':3100,'2026-04-27':4200,'2026-04-29':3400,'2026-05-02':5200,'2026-05-04':4100,'2026-05-10':2900,'2026-05-15':2500}
+      },
+    ]},
+    { country:'韓國', flag:'🇰🇷', routes:[
+      { city:'首爾仁川', code:'ICN', caa:'載客 218,702',
+        out:{'2026-04-15':1995,'2026-04-18':1800,'2026-04-20':3200,'2026-04-22':1995,'2026-04-25':2300,'2026-04-29':2800,'2026-05-01':2100,'2026-05-05':1995,'2026-05-10':1800,'2026-05-15':2200},
+        ret:{'2026-04-16':1409,'2026-04-19':1600,'2026-04-22':1500,'2026-04-25':1800,'2026-04-29':2200,'2026-05-02':1700,'2026-05-06':1409,'2026-05-10':1500,'2026-05-15':1600}
+      },
+    ]},
+  ]}
+};
+
+// ============================================================
+// Build top N price list for one direction
+// ============================================================
+function buildPriceList(prices, year, month, topN) {
+  var pfx = year+'-'+String(month+1).padStart(2,'0')+'-';
+  var dim = new Date(year, month+1, 0).getDate();
+  var list = [];
+  for(var i=1;i<=dim;i++){
+    var k=pfx+String(i).padStart(2,'0');
+    if(prices[k]) list.push({day:i,price:prices[k],key:k});
+  }
+  list.sort(function(a,b){return a.price-b.price;});
+  var top = list.slice(0, topN);
+  if(!top.length) return '<div style="color:#ccc;font-size:11px;text-align:center;padding:12px">當月無資料</div>';
+
+  var h = '';
+  top.forEach(function(item, idx) {
+    var dt = new Date(year, month, item.day);
+    var dow = DN[dt.getDay()];
+    var isWe = dt.getDay()===0||dt.getDay()===6;
+    var hol = getHol(item.key);
+    var bg = getBg(item.price);
+    var rowBg = idx % 2 === 0 ? '#fff' : '#fafafa';
+
+    h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:'+rowBg+';border-radius:3px">';
+    // Rank
+    h += '<div style="width:18px;height:18px;border-radius:50%;background:'+(idx<3?'#16a34a':'#94a3b8')+';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(idx+1)+'</div>';
+    // Date
+    h += '<div style="flex:1;min-width:0">';
+    h += '<span style="font-size:12px;font-weight:600'+(isWe||hol?';color:'+TC.weekend:'')+'">'+(month+1)+'/'+item.day+'('+dow+')</span>';
+    if(hol) h += ' <span style="font-size:8px;color:'+TC.holiday+'">'+hol+'</span>';
+    h += '</div>';
+    // Price badge
+    h += '<div style="background:'+bg+';color:'+txtC(bg)+';padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;flex-shrink:0">'+fP(item.price)+'</div>';
+    h += '</div>';
+  });
+  return h;
+}
+
+// ============================================================
+// Render
+// ============================================================
+function renderMonthBar(){
+  var bar=document.getElementById('month-bar');
+  var h='<span style="font-size:11px;font-weight:600;color:#555">月份</span>';
+  for(var i=0;i<12;i++){
+    var m=CUR_MONTH+i,y=CUR_YEAR;if(m>11){m-=12;y++;}
+    h+='<button class="month-btn'+(y===viewYear&&m===viewMonth?' active':'')+'" onclick="setMonth('+y+','+m+')">'+y+'/'+(m+1)+'</button>';
+  }
+  bar.innerHTML=h;
+}
+function setMonth(y,m){viewYear=y;viewMonth=m;renderMonthBar();renderAll();}
+
+function renderAll(){
+  var depData=DEP_DATA[activeDep];
+  if(!depData){document.getElementById('route-sections').innerHTML='<p style="color:#999;text-align:center;padding:40px">無資料</p>';return;}
+  var totalRoutes=0,groupIdx=0;
+  var container=document.getElementById('route-sections');
+  var html='';
+  var depLabel=activeDep==='TPE'?'台北桃園':activeDep==='KHH'?'高雄':'臺中';
+  var mPfx=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-';
+
+  depData.groups.forEach(function(group){
+    totalRoutes+=group.routes.length;
+    html+='<div class="country-label">'+group.flag+' '+group.country+' <span class="country-badge">'+group.routes.length+' 航線</span></div>';
+
+    // Legend after first group
+    if(groupIdx===0){
+      html+='<div style="margin:0 0 10px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;font-size:10px;display:flex;flex-direction:column;gap:3px">';
+      html+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+      html+='<span>左=<i class="fa-solid fa-plane-departure" style="font-size:8px;color:#166534;margin:0 2px"></i>去程</span>';
+      html+='<span>右=<i class="fa-solid fa-plane-arrival" style="font-size:8px;color:#1e40af;margin:0 2px"></i>回程</span>';
+      html+='<span><span class="cal-legend-dot" style="background:'+BG.weekend+'"></span>六日</span>';
+      html+='<span><span class="cal-legend-dot" style="background:'+BG.holiday+'"></span>假日</span>';
+      html+='<span><span class="cal-legend-dot" style="background:#16a34a"></span><span style="color:#fff;font-size:8px;margin-left:-7px;font-weight:700">1</span> Top 8 最便宜</span>';
+      html+='</div>';
+      html+='<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">';
+      html+='<span style="font-weight:600;color:#555;margin-right:2px">價格底色</span>';
+      PP.forEach(function(p){html+='<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:'+p.bg+';color:'+txtC(p.bg)+';font-size:8px;font-weight:600">\u2264'+(p.lte>=10000?'>10k':p.lte>=1000?p.lte/1000+'k':p.lte)+'</span>';});
+      html+='</div></div>';
+    }
+
+    html+='<div class="routes-grid">';
+    group.routes.forEach(function(route){
+      // Monthly best
+      var mBestO=null,mBestR=null;
+      Object.keys(route.out).forEach(function(k){if(k.startsWith(mPfx)){var v=route.out[k];if(!mBestO||v<mBestO)mBestO=v;}});
+      Object.keys(route.ret).forEach(function(k){if(k.startsWith(mPfx)){var v=route.ret[k];if(!mBestR||v<mBestR)mBestR=v;}});
+
+      html+='<div class="rc"><div class="rc-head"><div>';
+      html+='<div class="rc-city">'+depLabel+' '+activeDep+' - '+route.city+' '+route.code+' <span style="font-weight:400;color:#999;font-size:11px;margin-left:4px">'+viewYear+'/'+String(viewMonth+1).padStart(2,'0')+'</span></div>';
+      html+='<div class="rc-caa">'+route.caa+'</div>';
+      html+='</div><div style="text-align:right">';
+      if(mBestO||mBestR){
+        html+='<div class="rc-dir">';
+        if(mBestO) html+='<span style="background:'+getBg(mBestO)+';color:'+txtC(getBg(mBestO))+';padding:1px 6px;border-radius:3px;font-weight:700;font-size:12px"><i class="fa-solid fa-plane-departure" style="font-size:8px"></i> '+mBestO.toLocaleString()+'</span>';
+        if(mBestR) html+='<span style="background:'+getBg(mBestR)+';color:'+txtC(getBg(mBestR))+';padding:1px 6px;border-radius:3px;font-weight:700;font-size:12px"><i class="fa-solid fa-plane-arrival" style="font-size:8px"></i> '+mBestR.toLocaleString()+'</span>';
+        html+='</div>';
+      }else{html+='<span style="color:#ccc;font-size:11px">當月無資料</span>';}
+      html+='</div></div>';
+
+      // Dual list: left=outbound top 10, right=return top 10
+      html+='<div class="dual-cal">';
+      html+='<div class="dual-side left">';
+      html+='<div class="side-title out"><i class="fa-solid fa-plane-departure" style="font-size:8px;margin-right:3px"></i>去程 Top 10</div>';
+      html+=buildPriceList(route.out,viewYear,viewMonth,10);
+      html+='</div>';
+      html+='<div class="dual-side">';
+      html+='<div class="side-title ret"><i class="fa-solid fa-plane-arrival" style="font-size:8px;margin-right:3px"></i>回程 Top 10</div>';
+      html+=buildPriceList(route.ret,viewYear,viewMonth,10);
+      html+='</div>';
+      html+='</div>';
+
+      html+='</div>';
+    });
+    html+='</div>';
+    groupIdx++;
+  });
+
+  container.innerHTML=html;
+  document.getElementById('topbar-sub').textContent=depData.label+' . '+totalRoutes+' 條航線 . '+viewYear+'/'+(viewMonth+1);
+}
+
+function switchDep(el,dep){
+  document.querySelectorAll('.dep-tab').forEach(function(t){t.classList.remove('active');});
+  el.classList.add('active');
+  activeDep=dep;
+  renderAll();
+}
+
+(function(){
+  var tabs=document.getElementById('dep-tabs');
+  var deps=[{k:'TPE',l:'TPE 台北'},{k:'KHH',l:'KHH 高雄'},{k:'RMQ',l:'RMQ 臺中'}];
+  tabs.innerHTML=deps.map(function(d){
+    return '<button class="dep-tab'+(d.k===activeDep?' active':'')+'" onclick="switchDep(this,\''+d.k+'\')">'+d.l+'</button>';
+  }).join('');
+})();
+
+renderMonthBar();
+renderAll();
+</script>
+</body>
+</html>

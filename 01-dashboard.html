@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>機票雷達</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a1a; font-size: 14px; }
+
+  /* ===== Top Bar ===== */
+  .topbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-title { font-size: 16px; font-weight: 700; }
+  .topbar-sub { font-size: 12px; color: #888; }
+
+  /* ===== Departure Tabs ===== */
+  .dep-tabs { display: flex; gap: 2px; background: #f0f0f0; border-radius: 6px; padding: 2px; }
+  .dep-tab { padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #666; font-weight: 500; }
+  .dep-tab.active { background: #fff; color: #1a1a1a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 600; }
+  .dep-tab:hover:not(.active) { color: #333; }
+
+  /* ===== Layout ===== */
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ===== Stats Row ===== */
+  .stats-row { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; flex: 1; }
+  .stat-num { font-size: 22px; font-weight: 700; }
+  .stat-num.green { color: #16a34a; }
+  .stat-label { font-size: 11px; color: #999; margin-top: 2px; }
+
+  /* ===== Country Section ===== */
+  .country-section { margin-bottom: 24px; }
+  .country-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 12px;
+  }
+  .country-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .country-badge { font-size: 11px; color: #888; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+  .country-status { font-size: 11px; color: #999; }
+
+  /* ===== Route Cards ===== */
+  .route-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+  .route-card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px;
+    cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .route-card:hover { border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,0.08); }
+
+  .route-dest { flex: 1; }
+  .route-dest-city { font-size: 15px; font-weight: 600; }
+  .route-dest-code { font-size: 11px; color: #999; margin-top: 1px; }
+  .route-dest-airlines { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  .route-price { text-align: right; }
+  .route-price-val { font-size: 18px; font-weight: 700; }
+  .route-price-val.low { color: #16a34a; }
+  .route-price-val.mid { color: #ca8a04; }
+  .route-price-val.high { color: #dc2626; }
+  .route-price-val.na { color: #ccc; font-size: 13px; font-weight: 400; }
+  .route-price-label { font-size: 10px; color: #999; margin-top: 1px; }
+  .route-price-dir { display: flex; gap: 12px; margin-top: 4px; }
+  .route-price-dir span { font-size: 11px; color: #666; }
+
+  .route-scan { display: flex; gap: 4px; align-items: center; margin-top: 6px; }
+  .scan-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .scan-dot.active { background: #16a34a; }
+  .scan-dot.stale { background: #fbbf24; }
+  .scan-dot.empty { background: #e5e7eb; }
+  .scan-text { font-size: 10px; color: #bbb; margin-left: 4px; }
+
+  /* ===== Empty State ===== */
+  .route-card.empty { border-style: dashed; border-color: #ddd; cursor: default; }
+  .route-card.empty:hover { border-color: #ddd; box-shadow: none; }
+  .route-card.empty .route-dest-city { color: #ccc; }
+
+  /* ===== Footer ===== */
+  .footer { text-align: center; padding: 24px; font-size: 11px; color: #ccc; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div>
+      <div class="topbar-title">機票雷達</div>
+      <div class="topbar-sub">10 國 59 機場 · 48 條航線 · 689 批掃描</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="dep-tabs">
+      <button class="dep-tab active" onclick="switchDep(this)">全部</button>
+      <button class="dep-tab" onclick="switchDep(this)">TPE 台北</button>
+      <button class="dep-tab" onclick="switchDep(this)">KHH 高雄</button>
+      <button class="dep-tab" onclick="switchDep(this)">RMQ 臺中</button>
+    </div>
+    <div style="font-size:11px;color:#aaa">更新: 2026-04-05</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat"><div class="stat-num">48</div><div class="stat-label">監控航線</div></div>
+    <div class="stat"><div class="stat-num green">TWD 1,409</div><div class="stat-label">全站最低 RMQ↔ICN 回程</div></div>
+    <div class="stat"><div class="stat-num">689</div><div class="stat-label">累計掃描批次</div></div>
+    <div class="stat"><div class="stat-num">10</div><div class="stat-label">涵蓋國家</div></div>
+  </div>
+
+  <!-- 🇯🇵 Japan -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇯🇵 日本 <span class="country-badge">23 航線 · 278 批次</span></div>
+      <div class="country-status">██████████ 完整</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card" onclick="location.href='02-route-detail.html'">
+        <div class="route-dest">
+          <div class="route-dest-city">沖繩那霸</div>
+          <div class="route-dest-code">OKA · TPE / KHH / RMQ</div>
+          <div class="route-dest-airlines">虎航 · 樂桃 · 華航 · 星宇</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">2,461</div>
+          <div class="route-price-label">TWD 起</div>
+          <div class="route-price-dir"><span>去 2,461</span><span>回 3,216</span></div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">東京成田</div>
+          <div class="route-dest-code">NRT · TPE / KHH / RMQ</div>
+          <div class="route-dest-airlines">虎航 · 樂桃 · 酷航</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">2,315</div>
+          <div class="route-price-label">TWD 起</div>
+          <div class="route-price-dir"><span>去 -</span><span>回 2,315</span></div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">大阪關西</div>
+          <div class="route-dest-code">KIX · TPE / KHH / RMQ</div>
+          <div class="route-dest-airlines">虎航 · 樂桃 · 捷星</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">2,503</div>
+          <div class="route-price-label">TWD 起</div>
+          <div class="route-price-dir"><span>去 3,070</span><span>回 2,503</span></div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">九州福岡</div>
+          <div class="route-dest-code">FUK · TPE / KHH</div>
+          <div class="route-dest-airlines">虎航 · 華航 · 星宇</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">2,958</div>
+          <div class="route-price-label">TWD 起</div>
+          <div class="route-price-dir"><span>去 3,482</span><span>回 2,958</span></div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">北海道札幌</div>
+          <div class="route-dest-code">CTS · TPE / KHH</div>
+          <div class="route-dest-airlines">虎航 · 樂桃</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val mid">6,762</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">名古屋</div>
+          <div class="route-dest-code">NGO · TPE / KHH / RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val mid">7,007</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">東京羽田</div>
+          <div class="route-dest-code">HND · TPE</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val mid">7,189</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">宮古島</div>
+          <div class="route-dest-code">SHI · TPE / RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val mid">6,933</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">九州熊本</div>
+          <div class="route-dest-code">KMJ · RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val high">11,525</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">仙台</div>
+          <div class="route-dest-code">SDJ · TPE</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val na">尚未掃描</div>
+        </div>
+      </div>
+
+      <div class="route-card empty">
+        <div class="route-dest">
+          <div class="route-dest-city">岡山</div>
+          <div class="route-dest-code">OKJ · 有推廣連結，待掃描</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val na">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇰🇷 Korea -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇰🇷 韓國 <span class="country-badge">10 航線 · 139 批次</span></div>
+      <div class="country-status">████████░░ 良好</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">首爾仁川</div>
+          <div class="route-dest-code">ICN · TPE / KHH / RMQ</div>
+          <div class="route-dest-airlines">德威 · 真航空 · 大韓</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">1,409</div>
+          <div class="route-price-label">TWD 起</div>
+          <div class="route-price-dir"><span>去 -</span><span>回 1,409</span></div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">濟州</div>
+          <div class="route-dest-code">CJU · TPE / KHH / RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">4,136</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">釜山</div>
+          <div class="route-dest-code">PUS · TPE / KHH / RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val mid">5,472</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">首爾金浦</div>
+          <div class="route-dest-code">GMP · KHH</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val na">尚未掃描</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇹🇭 Thailand -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇹🇭 泰國 <span class="country-badge">6 航線 · 46 批次</span></div>
+      <div class="country-status">██████░░░░ 中等</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">曼谷廊曼</div>
+          <div class="route-dest-code">DMK · TPE / KHH</div>
+          <div class="route-dest-airlines">亞航 · 獅航</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">3,699</div>
+          <div class="route-price-label">TWD 起</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">曼谷素萬那普</div>
+          <div class="route-dest-code">BKK · TPE / KHH / RMQ</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">4,727</div>
+          <div class="route-price-label">TWD 起 (來回)</div>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">清邁</div>
+          <div class="route-dest-code">CNX · TPE / KHH</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val na">尚未掃描</div>
+        </div>
+      </div>
+
+      <div class="route-card empty">
+        <div class="route-dest">
+          <div class="route-dest-city">普吉島</div>
+          <div class="route-dest-code">HKT · 待建立</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val na">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇻🇳 Vietnam -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇻🇳 越南 <span class="country-badge">2 航線 · 6 批次</span></div>
+      <div class="country-status">██░░░░░░░░ 薄弱</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card">
+        <div class="route-dest">
+          <div class="route-dest-city">胡志明市</div>
+          <div class="route-dest-code">SGN · RMQ</div>
+          <div class="route-dest-airlines">越捷 · 華信</div>
+        </div>
+        <div class="route-price">
+          <div class="route-price-val low">3,126</div>
+          <div class="route-price-label">TWD 起</div>
+        </div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">富國島</div><div class="route-dest-code">PQC · TPE · 有推廣連結</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">峴港</div><div class="route-dest-code">DAD · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">河內</div><div class="route-dest-code">HAN · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇲🇾 Malaysia -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇲🇾 馬來西亞 <span class="country-badge">0 航線</span></div>
+      <div class="country-status">░░░░░░░░░░ 空白</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">吉隆坡</div><div class="route-dest-code">KUL · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">沙巴亞庇</div><div class="route-dest-code">BKI · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">檳城</div><div class="route-dest-code">PEN · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">蘭卡威</div><div class="route-dest-code">LGK · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇵🇭 Philippines -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇵🇭 菲律賓 <span class="country-badge">2 航線 · 4 批次</span></div>
+      <div class="country-status">██░░░░░░░░ 薄弱</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card">
+        <div class="route-dest"><div class="route-dest-city">宿霧</div><div class="route-dest-code">CEB · TPE</div></div>
+        <div class="route-price"><div class="route-price-val na">尚未掃描</div></div>
+      </div>
+      <div class="route-card">
+        <div class="route-dest"><div class="route-dest-city">馬尼拉</div><div class="route-dest-code">MNL · KHH</div></div>
+        <div class="route-price"><div class="route-price-val na">尚未掃描</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇮🇩 Indonesia -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇮🇩 印尼 <span class="country-badge">0 航線</span></div>
+      <div class="country-status">░░░░░░░░░░ 空白</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">峇里島</div><div class="route-dest-code">DPS · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">雅加達</div><div class="route-dest-code">CGK · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🇸🇬 Singapore + 🇭🇰 HK + 🇨🇳 China -->
+  <div class="country-section">
+    <div class="country-header">
+      <div class="country-name">🇸🇬 新加坡 · 🇭🇰 香港 · 🇨🇳 中國 <span class="country-badge">1 航線</span></div>
+      <div class="country-status">█░░░░░░░░░ 極少</div>
+    </div>
+    <div class="route-grid">
+      <div class="route-card">
+        <div class="route-dest"><div class="route-dest-city">新加坡</div><div class="route-dest-code">SIN · TPE</div></div>
+        <div class="route-price"><div class="route-price-val na">尚未掃描</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">香港</div><div class="route-dest-code">HKG · 待建立</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+      <div class="route-card empty">
+        <div class="route-dest"><div class="route-dest-city">上海浦東</div><div class="route-dest-code">PVG · TPE · 有推廣連結</div></div>
+        <div class="route-price"><div class="route-price-val na">—</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">機票雷達 · 資料來源 Trip.com · 48 航線 · 10 國 · 59 機場</div>
+
+<script>
+function switchDep(el) {
+  document.querySelectorAll('.dep-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  // TODO: filter route cards by departure airport
+}
+</script>
+</body>
+</html>
